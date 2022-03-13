@@ -19,7 +19,7 @@ def read_binarize(img_path, file_name):
     # read the given image
     img = io.imread(img_path)
     # use ostu method to find thresh val
-    thresh = 200#threshold_otsu(img)
+    thresh = threshold_otsu(img)
     # binarize according to a threshold
     img_binary = (img < thresh).astype(np.double)
     # close gaps
@@ -94,11 +94,11 @@ def get_preds(train, test, num_neighbors, train_labels, test_labels):
         # find neighbors and take majority wins
         for n in range(num_neighbors):
             neighbors.append(train_labels[d[n]])
-        # pred.append(max(set(neighbors), key=neighbors.count))
-        pred.append(train_labels[d[1]])
+        pred.append(max(set(neighbors), key=neighbors.count))
+        # pred.append(train_labels[d[1]])
         real.append(test_labels[i])
 
-        if test_labels[i] == train_labels[d[1]]:#max(set(neighbors), key=neighbors.count):
+        if test_labels[i] == max(set(neighbors), key=neighbors.count):
             corr += 1
         total += 1
 	
