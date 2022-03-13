@@ -4,7 +4,7 @@ from scipy.spatial.distance import cdist
 from skimage.measure import label, regionprops, moments, moments_central, moments_normalized, moments_hu 
 from skimage import io, exposure 
 from skimage.filters import threshold_otsu
-from skimage.morphology import binary_dilation
+from skimage.morphology import binary_dilation, binary_closing
 import matplotlib.pyplot as plt 
 from matplotlib.patches import Rectangle 
 import pickle
@@ -19,11 +19,11 @@ def read_binarize(img_path, file_name):
     # read the given image
     img = io.imread(img_path)
     # use ostu method to find thresh val
-    thresh = threshold_otsu(img)
+    thresh = 200#threshold_otsu(img)
     # binarize according to a threshold
     img_binary = (img < thresh).astype(np.double)
     # close gaps
-    img_binary = binary_dilation(img_binary)
+    img_binary = binary_closing(img_binary)
     # get all connected components
     img_label = label(img_binary, background=0)
     
@@ -33,10 +33,6 @@ def read_binarize(img_path, file_name):
     # stores the statistical information for the given image
     # NOTE: shape is number of regions by 7 for hu moments
     features = np.zeros((len(regions), 7))
-
-    # for the image export of each character
-    ax = plt.gca()
-    io.imshow(img_binary)
 
     # function to extract statistical info from each image
     def build_set(minr, minc, maxr, maxc, region):
@@ -57,19 +53,9 @@ def read_binarize(img_path, file_name):
         width = maxc - minc
         if width > 10 and height > 10:
             build_set(minr, minc, maxr, maxc, reg)
-            ax.add_patch(Rectangle((minc, minr), maxc - minc, maxr - minr, fill = False, edgecolor = 'red', linewidth = 1))
-    ax.set_title('Bounding Boxes')
-    
-    # Check whether the specified path exists or not
-    if(not os.path.exists('./results/training_annotations')):
-        os.makedirs('./results/training_annotations')
-    
-    # save our bounding boxes image
-    plt.savefig("./results/training_annotations/{}.png".format(file_name))
-    plt.close('all')
 
     # ignore all the rows with just zeros
-    return features[~np.all(features == 0, axis=1)]
+    return features[~np.all(features == 0, axis=1)], regions
 
 '''
 Normalize the features by pushing the mean and variance to 0 and 1
@@ -90,11 +76,7 @@ def normalize(features):
     
     return combined, flattned, norm_features, mean, std_dev
 
-def get_preds(normalized, test_mat, num_neighbors):
-
-    # keeps track of the locations of each letter array
-    letter_locs = {}
-    count = 0
+def get_preds(train, test, num_neighbors, train_labels, test_labels):
 
     # store the distances between train and test and accuracy stuff
     total = 0
@@ -102,18 +84,7 @@ def get_preds(normalized, test_mat, num_neighbors):
     pred = []
     real = []
 
-    acc = corr/total
-    print('Training accuracy: ', acc)
-
-    # create the label vector
-    for k in normalized.keys():
-        for i in range(count, count+len(normalized[k])):
-            letter_locs[i] = k
-        count += len(normalized[k])
-
-    conc = np.concatenate([normalized[k] for k in normalized])
-
-    D = cdist(conc, test_mat)
+    D = cdist(test, train)
     D_index = np.argsort(D, axis=1)
 
     for i, d in enumerate(D_index):
@@ -122,14 +93,45 @@ def get_preds(normalized, test_mat, num_neighbors):
 
         # find neighbors and take majority wins
         for n in range(num_neighbors):
-            neighbors.append(letter_locs[d[1]])
-        pred.append(max(set(neighbors), key=neighbors.count))
-        real.append(letter_locs[i])
+            neighbors.append(train_labels[d[n]])
+        # pred.append(max(set(neighbors), key=neighbors.count))
+        pred.append(train_labels[d[1]])
+        real.append(test_labels[i])
 
-        if letter_locs[i] == letter_locs[d[1]]:
+        if test_labels[i] == train_labels[d[1]]:#max(set(neighbors), key=neighbors.count):
             corr += 1
         total += 1
 	
     # for i in range(num_neighbors):
 	# 	neighbors.append(distances[i][0])
-    return pred, real, conc
+    return pred, real
+
+def label_img(img_name, labels, regions):
+    
+    # read the given image
+    img = io.imread('./H1-16images/' + img_name + '.bmp')
+    
+    # for the image export of each character
+    ax = plt.gca()
+    io.imshow(img)
+
+    # get the regions again and overlay labels
+    for reg, props in enumerate(regions):
+        minr, minc, maxr, maxc = props.bbox
+        height = maxr - minr
+        width = maxc - minc
+        if width > 10 and height > 10:
+            ax.add_patch(Rectangle((minc, minr), maxc - minc, maxr - minr, fill = False, edgecolor = 'red', linewidth = 1))
+            try:
+                ax.text(minc-20, minr-20, labels[reg], fontsize=11, verticalalignment='top')
+            except:
+                continue
+    ax.set_title('{} Bounding Boxes'.format(img_name))
+    
+    # Check whether the specified path exists or not
+    if(not os.path.exists('./results')):
+        os.makedirs('./results')
+    
+    # save our bounding boxes image
+    plt.savefig("./results/{}.png".format(img_name))
+    plt.close('all')
