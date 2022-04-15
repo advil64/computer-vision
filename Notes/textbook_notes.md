@@ -11,4 +11,4 @@
 ### Fourier Transforms
 - How can we analyze what a given filter does to high, medium, and low frequencies? The answer is to simply pass a sinusoid of known frequency through the filter and to observe by how much it is attenuated.
 - The Fourier transform is simply a tabulation of the magnitude and phase response at each frequency, it is the response to a complex sinusoid of frequency $\omega$ passed through the filter h(x)
-- 
+- [Helpful Resource](https://homepages.inf.ed.ac.uk/rbf/HIPR2/fourier.htm#:~:text=Brief%20Description,is%20the%20spatial%20domain%20equivalent.)
